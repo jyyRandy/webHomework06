@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>index</title>
+    <style type="text/css">
+        .show{
+            width: 100px;
+            height: 100px;
+        }
+
+        .row{
+            display:flex;
+        }
+
+        .cell{
+            width:50px;
+            height: 50px;
+            outline: 2px solid black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: bisque;
+        }
+
+        .img_container{
+            width:30px;
+            height:30px
+        }
+
+        .img_container img{
+            width:30px;
+            height:30px
+        }
+
+        img {
+            width:auto;
+            height:auto;
+            max-width:100%;
+            max-height:100%;
+        }
+
+        .footer{
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<div>
+    <img src="images/robot.webp" loading="lazy" class="show">
+    <img src="images/prize.webp" data-src="images/loading.webp" class="show">
+    <img src="images/bomb.webp" loading="lazy" class="show">
+</div>
+
+<div class="container">
+    <div class="map"></div>
+
+    <div class="footer">
+        <button class="button" onclick="startGame()">start game</button>
+
+        <span class="timer"></span>
+        <span class="score"></span>
+    </div>
+</div>
+<a href="index.html">remake hhh</a>
+<div>游戏规则：</div>
+<div>一个奖杯奖励10分(初始10个），一个炸弹炸掉20分（初始3个），在固定的60秒内，看看你最多能得多少分</div>
+<div>注意哦，没采集到一个奖杯会再出现一个奖杯和一个炸弹，祝你好运~</div>
+<div>当你单次游戏结束后需要点remake链接重开哦</div>
+<script>
+    let map=[]
+    let score=0
+    let person=[0, 0]
+    let bonusRecord=[]
+    let bombRecord=[]
+    let flag=0
+    let menu=0
+
+
+    const BONUS_SCORE = 10
+    const BONUS_COUNT = 10
+    const BOMB_SCORE = 20
+    const BOMB_COUNT = 3
+    const MAP_SIZE = {width:10, height:10}
+
+    const IMAGE_RESOURCES = {}
+    const IMAGES = [
+        {name:'robot', url:'./images/robot.svg'},
+        {name:'prize', url:'./images/prize.svg'},
+        {name:'bomb', url:'./images/bomb.svg'},
+    ]
+    //初始化二位对象地图并返回
+    const initMap = (size, bonusCount, bonusScore, bombCount, bombScore) => {
+        person = [0, 0]
+
+        let width = size.width;
+        let height = size.height;
+
+        const map = []
+        bonusRecord = initBonus(size, bonusCount)
+        bombRecord = initBomb(size, bombCount, bonusRecord)
+
+        // console.log(bonusRecord)
+        // console.log(bombCount)
+
+        for (let i = 0; i < width; i++) {
+            const rowItem = []
+            for (let j = 0; j < height; j++) {
+                if(isInRecord([i, j], bonusRecord)){
+                    rowItem.push({
+                        bonus:bonusScore
+                    })
+                }else if(isInRecord([i, j], bombRecord)){
+                    rowItem.push({
+                        bomb:bombScore
+                    })
+                }else{
+                    rowItem.push(null)
+                }
+            }
+            map.push(rowItem)
+        }
+
+        return map
+
+    }
+
+    //初始化奖励坐标数组并返回
+    function initBonus(size, count) {
+        const record=[]
+
+
+        while(record.length<count){
+            let x = Math.floor(Math.random() * count);
+            let y = Math.floor(Math.random() * count);
+
+            if((x===0&&y===0)||isInRecord([x, y], record)){
+                continue;
+            }
+            record.push([x,y])
+        }
+
+        return record
+    }
+
+    function initBomb(size, count, bonusRecord) {
+        const record=[]
+
+
+        while(record.length<count){
+            let x = Math.floor(Math.random() * MAP_SIZE.width);
+            let y = Math.floor(Math.random() * MAP_SIZE.height);
+
+            if((x===0&&y===0)||isInRecord([x, y], record)||isInRecord([x,y], bonusRecord)){
+                continue;
+            }
+            record.push([x,y])
+        }
+
+        return record
+    }
+
+    const drawMap = (map) => {
+        const mapContainer = document.getElementsByClassName('map')[0]
+        mapContainer.innerHTML=''
+
+        for(let [rowIndex, row] of map.entries()) {
+            const rowEl = document.createElement('div')
+
+            rowEl.className='row'
+            for(let [colIndex, col] of row.entries()) {
+                const colEl = document.createElement('div')
+                colEl.className='cell'
+
+                const isBonusCell = isBonus(col)
+                const isBombCell = isBomb(col)
+                const isPersonCell = isEqualVector(person, [rowIndex, colIndex])
+
+                drawCellWithImage(colEl, {map, rowIndex, colIndex, col}, {isBonusCell, isBombCell, isPersonCell})
+
+                rowEl.appendChild(colEl)
+            }
+            mapContainer.appendChild(rowEl)
+        }
+    }
+
+    const isEqualVector = (a, b) => a[0]===b[0]&&a[1]===b[1]
+    const isInRecord = (pos, record) => record.some(x => isEqualVector(x, pos))
+    const isBonus = (item) => item && item.bonus === 10
+    const isBomb = (item) => item && item.bomb === 20
+    // const isPerson = (item) => item && item.person
+
+    const isBonusEmpty = (map) => map.every(row => row.every(col => !isBonus(col)))
+    const drawCellWithImage = (container, {map, rowIndex, colIndex, col},
+                               {isBonusCell, isBombCell, isPersonCell}) => {
+        if (isPersonCell) {
+            const person = createImageContainer()
+
+            person.appendChild(createImage(IMAGE_RESOURCES.robot))
+            //将机器人图片div块加入到colEl中
+            container.appendChild(person)
+        }
+
+        if (isBonusCell) {
+            if (isPersonCell) {
+                score += col.bonus
+                map[rowIndex][colIndex] = null
+                while(true){
+                    const x = Math.floor(Math.random() * map.length);
+                    const y = Math.floor(Math.random() * map.length);
+                    if(!isInRecord([x,y],bombRecord)&&!isInRecord([x,y], bonusRecord)&&
+                        !isEqualVector([rowIndex, colIndex], [x, y])){
+                        map[x][y]={bomb:BOMB_SCORE}
+                        bombRecord.push([x, y])
+                        console.log(bombRecord)
+                        break
+                    }
+                }
+                while(true){
+                    const x = Math.floor(Math.random() * map.length);
+                    const y = Math.floor(Math.random() * map.length);
+                    if(!isInRecord([x,y],bombRecord)&&!isInRecord([x,y], bonusRecord)&&
+                        !isEqualVector([rowIndex, colIndex], [x, y])){
+                        map[x][y]={bonus:BONUS_SCORE}
+                        for (let i = 0; i < bonusRecord.length; i++) {
+                            if(isEqualVector([colIndex, rowIndex],bonusRecord[i])){
+                                console.log(bonusRecord[i])
+                                bonusRecord[i]=[x, y]
+                                console.log(bombRecord[i])
+                            }
+                        }
+                        break
+                    }
+                }
+            } else {
+                const bonus = createImageContainer()
+                bonus.appendChild(createImage(IMAGE_RESOURCES.prize))
+                container.appendChild(bonus)
+            }
+        }
+
+        if (isBombCell) {
+            if (isPersonCell){
+                score -= col.bomb
+                map[rowIndex][colIndex] = null
+            }else {
+                const bomb  = createImageContainer()
+                bomb.appendChild(createImage(IMAGE_RESOURCES.bomb))
+                container.appendChild(bomb)
+            }
+        }
+
+
+    }
+    const createImage = (url) => {
+        const image = new Image()
+        image.src=url
+        return image
+    }
+
+    //返回类名为image_container的div元素
+    const createImageContainer = () => {
+        const container = document.createElement('div')
+        container.className = "image_container"
+        return container
+    }
+
+    const loadImage = ({name, url})=>{
+        return new Promise((resolve, reject) =>{
+            const image = new Image();
+            image.src=url;
+
+            image.onload = ()=>resolve({name, url});
+            image.onerror = ()=>reject(url);
+        })
+    }
+    const loadImages = async ()=>{
+        const images = await  Promise.all(IMAGES.map(loadImage))
+
+        for(let {name, url} of images) {
+            IMAGE_RESOURCES[name]=url
+        }
+    }
+
+    const move = (timer)=>(e)=>{
+        const [y,x] = person
+
+        switch (e.code){
+            case 'ArrowRight':
+                if(x===MAP_SIZE.width-1){
+                    return
+                }
+                person=[y, x+1]
+
+                break
+            case 'ArrowLeft':
+                if(x===0){
+                    return
+                }
+                person=[y, x-1]
+
+                break
+            case 'ArrowUp':
+                if(y===0){
+                    return
+                }
+                person=[y-1, x]
+
+                break
+            case 'ArrowDown':
+                if(y===MAP_SIZE.height-1){
+                    return
+                }
+                person=[y+1, x]
+
+                break
+            default:
+                return
+        }
+        drawMap(map)
+
+        const scoreEl = document.getElementsByClassName('score')[0]
+
+        scoreEl.innerHTML = `当前分数${score}`
+
+        setTimeout(()=>{
+            if(score<0){
+                alert("GG")
+
+                clearInterval(timer)
+            }else if(isBonusEmpty(map)){
+                alert("Success")
+
+                clearInterval(timer)
+            }
+        },0)
+
+    }
+
+    const startGame = (time=60)=>{
+        score = 0
+        if(flag===1) return
+        flag=1
+        if(menu===1){
+            map=initMap(MAP_SIZE, BONUS_COUNT, BONUS_SCORE, BOMB_COUNT, BOMB_SCORE)
+            drawMap(map)
+        }
+        menu=1
+        const timerEl = document.getElementsByClassName('timer')[0]
+
+        let remainTime = time
+
+        timerEl.innerHTML=`剩余时间${remainTime}`
+
+        const scoreEl = document.getElementsByClassName('score')[0]
+
+        scoreEl.innerHTML=`当前分数：${score}`
+
+        const timer=setInterval(()=>{
+            if(remainTime<=0){
+                alert('GG')
+
+                clearInterval(timer)
+                return
+            }
+            remainTime--;
+            timerEl.innerHTML=`剩余时间：${remainTime}`
+
+        },1000)
+
+        document.addEventListener('keydown', move(timer))
+    }
+
+
+
+    const main = async ()=>{
+        map=initMap(MAP_SIZE, BONUS_COUNT, BONUS_SCORE, BOMB_COUNT, BOMB_SCORE)
+        await loadImages()
+        drawMap(map)
+    }
+
+    main()
+
+</script>
+</body>
+</html>
